@@ -69,8 +69,7 @@ Your pull requests are very welcome! To contribute, please refer to [this](https
 
 [M9 DevSecOps](modules/devsecops)
 * The DevOps model and its benefits 
-* Automating code linting and security testing in automated builds 
-* GitHub Actions Workflows
+* Automating code linting, security testing, and deployment with GitHub Actions
 
 [M10 MLOps](modules/mlops)
 * MLOps and their benefits in distributed contexts
