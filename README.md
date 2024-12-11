@@ -68,10 +68,10 @@ Your pull requests are very welcome! To contribute, please refer to [this](https
 * The *Conductor* orchestration framework
 
 [M9 DevSecOps](modules/devsecops)
-* The DevOps model and its benefits 
+* The DevSecOps model and its benefits in distributed contexts
 * Automating code linting, security testing, and deployment with GitHub Actions
 
 [M10 MLOps](modules/mlops)
-* MLOps and their benefits in distributed contexts
+* The MLOps model and its benefits in distributed contexts
 * Tracking ML experiments with MLFlow
 * Observing ML models in production with EvidentlyAI
