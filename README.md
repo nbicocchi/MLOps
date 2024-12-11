@@ -73,4 +73,5 @@ Your pull requests are very welcome! To contribute, please refer to [this](https
 
 [M10 MLOps](modules/mlops)
 * MLOps and their benefits in distributed contexts
-* Automating model observability with EvidentlyAI
+* Tracking ML experiments with MLFlow
+* Observing ML models in production with EvidentlyAI
