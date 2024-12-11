@@ -1,19 +1,19 @@
-# Tracking and Monitoring of Machine Learning Experiments with MLflow
+# Tracking and Monitoring ML-enabled Microservices
 
 ## Overview
 This project leverages MLflow for tracking machine learning experiments within a distributed microservices architecture, and uses EvidentlyAI for comprehensive monitoring.
 
-In particular, it performs the following:
+Specifically, it performs the following:
 - Grid search optimization of various machine learning models with different hyperparameters.
 - Tracking and logging results as metadata.
 - Custom retrieval of information about experiments and runs according to specific needs.
 - Setting a chosen model as a microservice.
 - Training and testing with this model.
-- Simulating production data
-- Monitoring
+- Simulating production data.
+- Monitoring of model performance and data quality.
 
-The system is composed by 5 fundamental containerized *micro-services*:
-- **MySQL DB**: to *store* and *query* necessary data;
+The system is composed of 5 fundamental containerized *microservices*:
+- **PostgreSQL DB**: to *store* and *query* necessary data;
 - **simulator**: to simulate *training*, *testing* and *production* data;
 - **ML model**: a trainable model that can be tested on *data batches*;
 - **tracking**: a service to log, retrieve, and filter metadata and results from experiments, providing flexible access to metrics, parameters, and performance data. 
@@ -21,7 +21,7 @@ The system is composed by 5 fundamental containerized *micro-services*:
 
 
 
-Each component is identified by a **containerized micro-service**, with its own dependencies and environment, following the typical *application layers* structure (except the *MySQL DB*).
+Each component is identified by a **containerized micro-service**, with its own dependencies and environment, following the typical *application layers* structure (except the *PostgreSQL DB*).
 
 ```
 src
@@ -35,283 +35,50 @@ src
     |-- controller
 ```
 
-All *micro-services* are developed using `Python`, basing on [`Flask`](https://flask.palletsprojects.com/en/3.0.x/) framework and the [`Flask RESTful`](https://flask-restful.readthedocs.io/en/latest/) library to provide *REST API*.
+All *microservices* are developed using `Python`, based on [`Flask`](https://flask.palletsprojects.com/en/3.0.x/) framework and the [`Flask RESTful`](https://flask-restful.readthedocs.io/en/latest/) library to provide *REST APIs*.
 
 ```
 from flask import Flask
 from flask_restful import Api, Resource, reqparse
-from flask_mysqldb import MySQL
+from flask_sqlalchemy import SQLAlchemy
 ```
 
-For each component a `query.py` script (under `src/persistence/repository` folder) is provided, useful to *query* the *MYSQL DB* to *store* and *request* the proper data.
+For each component, a `query.py` script (under the `src/persistence/repository` folder) is provided to *query* the *PostgresQL DB* for *storing* and *requesting* the proper data.
 
-To reproduce the results a `random seed`, equal to [42](https://en.wikipedia.org/wiki/Phrases_from_The_Hitchhiker%27s_Guide_to_the_Galaxy), is set.
+To reproduce the results, a `random seed` of [42](https://en.wikipedia.org/wiki/Phrases_from_The_Hitchhiker%27s_Guide_to_the_Galaxy) is set.
 
-Each component can be finally runned with a `Dockerfile` as an indipendent `Docker` *container*.
+Each component can be finally run with a `Dockerfile` as an independent `Docker` *container*.
 
 
-## MySQL DB
+## PostgreSQL DB
 
-We have two MySQL databases:
+The system uses two PostgreSQL databases to manage data and metadata:
 
-1. **Dataset Database**: This database stores the datasets required for the ML model to perform prediction tasks. Specifically, it will be used to obtain training and validation data for the optimization process, testing data for model evaluation, and data to simulate production scenarios.
+1. **Dataset Database**: Stores the datasets required for ML model prediction tasks, including:
+   - Training and validation data for optimization
+   - Testing data for model evaluation  
+   - Production simulation data
 
-### Datasets table
+   The database contains tables for:
+   - Datasets: Stores dataset metadata
+   - Samples: Stores the actual wine samples with 13 features
+   - Predictions: Records model predictions
+   - Targets: Stores ground truth labels
 
-| **Fields**   | **Type**       | **Attributes** |
-|--------------|----------------|----------------|
-| *dataset_id* | `int`          | primary key    |
-| *name*       | `varchar(255)` |                |
+2. **MLflow Metadata Database**: Automatically managed by MLflow to track experiment metadata:
+   - Model information and versioning
+   - Hyperparameters
+   - Metrics and results
+   - Run history and artifacts
 
-### Samples table
+   Key tables include:
+   - Experiments: Tracks ML experiments
+   - Runs: Individual training runs
+   - Metrics: Performance metrics
+   - Parameters: Model hyperparameters
+   - Model Versions: Model versioning info
 
-|**Fields**                    |**Type**      |**Attributes**|
-|------------------------------|--------------|--------------|
-|*sample_id*                   |`int`         |primary key   |
-|*dataset_id*                  |`int`         |foreign key   |
-|*sample_index*                |`int`         |              |
-|*Alcohol*                     |`float`       |              |
-|*Malicacid*                   |`float`       |              |
-|*Ash*                         |`float`       |              |
-|*Alcalinity_of_ash*           |`float`       |              |
-|*Magnesium*                   |`float`       |              |
-|*Total_phenols*               |`float`       |              |
-|*Flavanoids*                  |`float`       |              |
-|*Nonflavanoid_phenols*        |`float`       |              |
-|*Proanthocyanins*             |`float`       |              |
-|*Color_intensity*             |`float`       |              |
-|*Hue*                         |`float`       |              |
-|*0D280_0D315_of_diluted_wines*|`float`       |              |
-|*Proline*                     |`float`       |              |
-
-### Predictions table
-
-|**Fields**        |**Type**|**Attributes**|
-|------------------|--------|--------------|
-|*prediction_id*   |`int`   |primary key   |
-|*sample_index*    |`int`   |foreign key   |
-|*prediction_index*|`int`   |              |
-|*class*           |`int`   |              |
-
-### Targets table
-
-|**Fields**    |**Type**|**Attributes**|
-|--------------|--------|--------------|
-|*target_id*   |`int`   |primary key   |
-|*sample_index*|`int`   |foreign key   |
-|*target_index*|`int`   |              |
-|*class*       |`int`   |              |
-
-2. **MLflow Metadata Database**: This database is automatically managed by MLflow and stores tables for logging experiment metadata, including information about ML models, hyperparameters, metrics, and version history. An explanation of all the tables is provided in M2.1 MLflow Introduction.
-
-### Alembic Version Table
-
-| **Fields**       | **Type**        | **Attributes**    |
-|------------------|-----------------|-------------------|
-| *version_num*    | `varchar(32)`   | primary key       |
-
-
-### Datasets Table
-
-| **Fields**            | **Type**       | **Attributes** |
-|-----------------------|----------------|----------------|
-| *dataset_uuid*        | `varchar(36)`  |                |
-| *experiment_id*       | `int`          | primary key    |
-| *name*                | `varchar(500)` | primary key    |
-| *digest*              | `varchar(36)`  | primary key    |
-| *dataset_source_type* | `varchar(36)`  |                |
-| *dataset_source*      | `text`         |                |
-| *dataset_schema*      | `mediumtext`   |                |
-| *dataset_profile*     | `mediumtext`   |                |
-
-
-### Experiment Tags Table
-
-| **Fields**        | **Type**        | **Attributes**    |
-|-------------------|-----------------|-------------------|
-| *key*             | `varchar(250)`  | primary key       |
-| *value*           | `varchar(5000)` |                   |
-| *experiment_id*   | `int`           | primary key       |
-
-
-### Experiments Table
-
-| **Fields**           | **Type**        | **Attributes** |
-|----------------------|-----------------|----------------|
-| *experiment_id*      | `int`           | primary key    |
-| *name*               | `varchar(256)`  |                |
-| *artifact_location*  | `varchar(256)`  |                |
-| *lifecycle_stage*    | `varchar(32)`   |                |
-| *creation_time*      | `bigint`        |                |
-| *last_update_time*   | `bigint`        |                |
-
-
-### Input Tags Table
-
-| **Fields**        | **Type**        | **Attributes**    |
-|-------------------|-----------------|-------------------|
-| *input_uuid*      | `varchar(36)`   | primary key       |
-| *name*            | `varchar(255)`  | primary key       |
-| *value*           | `varchar(500)`  |                   |
-
-
-### Inputs Table
-
-| **Fields**         | **Type**        | **Attributes**    |
-|--------------------|-----------------|-------------------|
-| *input_uuid*       | `varchar(36)`   |                   |
-| *source_type*      | `varchar(36)`   | primary key       |
-| *source_id*        | `varchar(36)`   | primary key       |
-| *destination_type* | `varchar(36)`   | primary key       |
-| *destination_id*   | `varchar(36)`   | primary key       |
-
-
-### Latest Metrics Table
-
-| **Fields**       | **Type**        | **Attributes**    |
-|------------------|-----------------|-------------------|
-| *key*            | `varchar(250)`  | primary key       |
-| *value*          | `double`        |                   |
-| *timestamp*      | `bigint`        |                   |
-| *step*           | `bigint`        |                   |
-| *is_nan*         | `tinyint(1)`    |                   |
-| *run_uuid*       | `varchar(32)`   | primary key       |
-
-
-### Metrics Table
-
-| **Fields**      | **Type**        | **Attributes**   |
-|------------------|-----------------|-------------------|
-| *key*            | `varchar(250)`  | primary key       |
-| *value*          | `double`        | primary key       |
-| *timestamp*      | `bigint`        | primary key       |
-| *run_uuid*       | `varchar(32)`   | primary key       |
-| *step*           | `bigint`        | primary key       |
-| *is_nan*         | `tinyint(1)`    | primary key       |
-
-
-### Model Version Tags Table
-
-| **Fields**        | **Type**        | **Attributes**    |
-|-------------------|-----------------|-------------------|
-| *key*             | `varchar(250)`  | primary key       |
-| *value*           | `varchar(5000)` |                   |
-| *name*            | `varchar(256)`  | primary key       |
-| *version*         | `int`           | primary key       |
-
-
-### Model Versions Table
-
-| **Fields**           | **Type**        | **Attributes**   |
-|----------------------|-----------------|-------------------|
-| *name*               | `varchar(256)`  | primary key       |
-| *version*            | `int`           | primary key       |
-| *creation_time*      | `bigint`        |                   |
-| *last_updated_time*  | `bigint`        |                   |
-| *description*        | `varchar(5000)` |                   |
-| *user_id*            | `varchar(256)`  |                   |
-| *current_stage*      | `varchar(20)`   |                   |
-| *source*             | `varchar(500)`  |                   |
-| *run_id*             | `varchar(32)`   |                   |
-| *status*             | `varchar(20)`   |                   |
-| *status_message*     | `varchar(500)`  |                   |
-| *run_link*           | `varchar(500)`  |                   |
-| *storage_location*    | `varchar(500)`  |                   |
-
-
-### Params Table
-
-| **Fields**      | **Type**        | **Attributes**   |
-|------------------|-----------------|-------------------|
-| *key*            | `varchar(250)`  | primary key       |
-| *value*          | `varchar(8000)` |                   |
-| *run_uuid*       | `varchar(32)`   | primary key       |
-
-
-### Registered Model Aliases Table
-
-| **Fields**         | **Type**        | **Attributes**   |
-|--------------------|-----------------|-------------------|
-| *alias*            | `varchar(256)`  | primary key       |
-| *version*          | `int`           |                   |
-| *name*             | `varchar(256)`  | primary key       |
-
-
-### Registered Model Tags Table
-
-| **Fields**        | **Type**        | **Attributes**   |
-|-------------------|-----------------|-------------------|
-| *key*             | `varchar(250)`  | primary key       |
-| *value*           | `varchar(5000)` |                   |
-| *name*            | `varchar(256)`  | primary key       |
-
-
-### Registered Models Table
-
-| **Fields**           | **Type**        | **Attributes**   |
-|----------------------|-----------------|-------------------|
-| *name*               | `varchar(256)`  | primary key       |
-| *creation_time*      | `bigint`        |                   |
-| *last_updated_time*  | `bigint`        |                   |
-| *description*        | `varchar(5000)` |                   |
-
-
-### Runs Table
-
-| **Fields**           | **Type**        | **Attributes**   |
-|----------------------|-----------------|-------------------|
-| *run_uuid*           | `varchar(32)`   | primary key       |
-| *name*               | `varchar(250)`  |                   |
-| *source_type*        | `varchar(20)`   |                   |
-| *source_name*        | `varchar(500)`  |                   |
-| *entry_point_name*   | `varchar(50)`   |                   |
-| *user_id*            | `varchar(256)`  |                   |
-| *status*             | `varchar(9)`    |                   |
-| *start_time*         | `bigint`        |                   |
-| *end_time*           | `bigint`        |                   |
-| *source_version*     | `varchar(50)`   |                   |
-| *lifecycle_stage*    | `varchar(20)`   |                   |
-| *artifact_uri*       | `varchar(200)`  |                   |
-| *experiment_id*      | `int`           |                   |
-| *deleted_time*       | `bigint`        |                   |
-
-
-### Tags Table
-
-| **Fields**        | **Type**        | **Attributes**   |
-|-------------------|-----------------|-------------------|
-| *key*             | `varchar(250)`  | primary key       |
-| *value*           | `varchar(5000)` |                   |
-| *run_uuid*        | `varchar(32)`   | primary key       |
-
-
-### Trace Info Table
-
-| **Fields**        | **Type**        | **Attributes**   |
-|-------------------|-----------------|-------------------|
-| *request_id*      | `varchar(50)`   | primary key       |
-| *experiment_id*   | `int`           |                   |
-| *timestamp_ms*    | `bigint`        |                   |
-| *execution_time_ms*| `bigint`       |                   |
-| *status*          | `varchar(50)`   |                   |
-
-
-### Trace Request Metadata Table
-
-| **Fields**        | **Type**        | **Attributes**   |
-|-------------------|-----------------|-------------------|
-| *key*             | `varchar(250)`  | primary key       |
-| *value*           | `varchar(8000)` |                   |
-| *request_id*      | `varchar(50)`   | primary key       |
-
-
-### Trace Tags Table
-
-| **Fields**        | **Type**        | **Attributes**   |
-|-------------------|-----------------|-------------------|
-| *key*             | `varchar(250)`  | primary key       |
-| *value*           | `varchar(8000)` |                   |
-| *request_id*      | `varchar(50)`   | primary key       |
+For full database schema details, see [Database.md](extras/Database.md)
 
 
 ## Simulator
@@ -321,7 +88,7 @@ The focus of this *micro-service* is to extrapolate and simulate:
 - *testing* set: 20% of full *dataset*;
 - *production* set: 20% of full *dataset*, where a fouling process is applied to simulate data with *missing value* and different *distribution*, causing a performance drop.
 
-Starting from a *dataset*, this component allows to load on the **DB** the chosen set to simulate the different phase of a *ML model* life-cycle.
+Starting from a *dataset*, this component allows loading to the **DB** the chosen set to simulate the different phases of a *ML model* life-cycle.
 
 ### Wine Dataset
 
@@ -332,7 +99,7 @@ The [*Wine Dataset*](https://scikit-learn.org/stable/modules/generated/sklearn.d
 from sklearn.datasets import load_wine
 ```
 
-All the 13 *features* are *real* and *positive*, presenting no *missing value*, for a total of 178 *samples*, with 3 different *classes* to predict.
+All 13 *features* are *real* and *positive*, with no *missing values*, for a total of 178 *samples* and 3 different *classes* to predict.
 
 About *Wine Dataset*:
 > These data are the results of a chemical analysis of wines grown in the same region in Italy but derived from three different cultivars. The analysis determined the quantities of 13 constituents found in each of the three types of wines.
@@ -373,9 +140,10 @@ class SimulatorModel(IModel):
 
 ```
 
-The *Simulator model* allows to:
-- load the *Wine Dataset* in a [`Pandas`](https://pandas.pydata.org/) `Dataframe`, considering the *features* `X` and the *target* `y`;
-- then some operations are applied on the `DataFrame`, to finally set the attribute `X` and `y`.
+The *Simulator model* performs the following operations:
+- Loads the *Wine Dataset* into a [`Pandas`](https://pandas.pydata.org/) `DataFrame`, separating the *features* `X` and the *target* `y`
+- Applies transformations to the `DataFrame` to prepare the data
+- Sets the final `X` and `y` attributes with the processed data
 
 
 #### Simulator Service
@@ -536,17 +304,16 @@ class SimulatorService(IService):
 ```
 
 The *Simulator service* allows to:
-- create the different *tables* inside the *MySQL DB*, specifically the **datasets**, **samples**, **targets** and **predictions** tables;
-- load immediatly the *dataset records* on starting;
-- waiting for a *request* to insert *samples* and *targets*, therefore the *training*, *testing* or *production* set is defined into the *MySQL DB*.
-
+- create the different *tables* inside the *PostgreSQL DB*, specifically the **datasets**, **samples**, **targets** and **predictions** tables;
+- load immediately the *dataset records* on startup;
+- wait for *requests* to insert *samples* and *targets*, which define the *training*, *testing* or *production* sets in the *PostgreSQL DB*.
 
 #### Simulator Controller
 ```
 import logging
 from flask import Flask
 from flask_restful import Api, Resource, reqparse
-from flask_mysqldb import MySQL
+from flask_sqlalchemy import SQLAlchemy
 
 from service.i_service import IService
 from web.controller.i_controller import IController
@@ -556,8 +323,8 @@ class SimulatorController(IController):
     def __init__(
             self,
             simulator_service: IService,
-            app_host="127.0.0.1", app_port=5000, app_debug=False, base_url="/root", service_url="/simulator",
-            db_host="127.0.0.1", db_port=3306, db_name="", db_user="root", db_password="pass"
+            app_host="127.0.0.1", app_port=5004, app_debug=False, base_url="/root", service_url="/simulator",
+            db_host="127.0.0.1", db_port=5432, db_name="", db_user="root", db_password="pass"
     ):
         self.simulator_service = simulator_service
         self.app_host = app_host
@@ -581,18 +348,12 @@ class SimulatorController(IController):
 
     def initialize(self):
         self.app = Flask(__name__)
-        self.app.config["MYSQL_HOST"] = self.db_host
-        self.app.config["MYSQL_PORT"] = self.db_port
-        self.app.config["MYSQL_DB"] = self.db_name
-        self.app.config["MYSQL_USER"] = self.db_user
-        self.app.config["MYSQL_PASSWORD"] = self.db_password
-        self.app.config["MYSQL_CURSORCLASS"] = "DictCursor"
+        self.app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
         self.app.app_context().push()
         self.api = Api(self.app)
         self.parser = reqparse.RequestParser()
-        self.db = MySQL(self.app)
+        self.db = SQLAlchemy(self.app)
         self.logger = logging.getLogger("werkzeug")
-        # self.log.setLevel(logging.ERROR)
 
         self.simulator_service.db = self.db
         self.simulator_service.init_query()
@@ -654,16 +415,16 @@ class Simulator(Resource):
 
 ```
 
-The *Simulator controller* allows to:
-- build the `Flask` *App* and the *REST API*;
-- instantiate a connection to the *MySQL DB*;
-- mapping the `Resource` to the correct *endpoint*, allowing to define the proper behaviour for every **CRUD** operation;
-- for each `Resource` it is needed to define the arguments to *parse* inside the *request* body.
+The *Simulator controller* allows:
+- building the `Flask` *App* and the *REST API*
+- instantiating a connection to the *PostgreSQL DB*
+- mapping the `Resource` to the correct *endpoint*, allowing definition of proper behavior for every **CRUD** operation
+- defining the arguments to *parse* inside the *request* body for each `Resource`
 
 
 ## ML Model
 
-The focus of this *micro-service* is to have an *ML model* capable to be trained and tested over new data.
+The focus of this *microservice* is to have an *ML model* capable of being trained and tested over new data.
 
 
 ### Model
@@ -685,7 +446,7 @@ from sklearn.linear_model import LogisticRegression
 
 ### Data Pre-Processing
 
-The only precaution taken with respect to the data is to apply a [`Standard Scaler`](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html), fitted on the *training* set, to transform the data before passing to the *ML model*.
+The only data pre-processing step is applying a [`Standard Scaler`](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html), fitted on the *training* set, to transform the data before passing it to the *ML model*.
 
 ```
 from sklearn.preprocessing import StandardScaler
@@ -817,12 +578,18 @@ class MLService(IService):
 
     def define_set(self, records):
         records = pd.DataFrame(records)
-        self.prediction = records["sample_index"].to_frame(name="sample_index")
+        columns = records.columns.to_list()
+        # Rename the second occurrence of sample_index to avoid duplication
+        sample_index_idx = [i for i, s in enumerate(columns) if "sample_index" in s][1]
+        columns[sample_index_idx] = "targets.sample_index"
+        records.columns = columns
+
+        self.prediction = records[["sample_index"]].copy()
         records = records.drop(columns=[
             "dataset_id", "sample_id", "target_id",
             "sample_index", "target_index", "targets.sample_index"
         ])
-        records.replace({"null", np.nan})
+        records.fillna(records.mean(), inplace=True)
         X = records.drop(columns=["class"])
         y = records["class"]
         return X, y
@@ -852,16 +619,16 @@ class MLService(IService):
         self.query.insert_predictions_records(records)
 ```
 
-The *ML Model service* allows to:
-- waiting for a *request* to *train* or *test* the *ML model* on the requested set, properly selecting the *samples* and *targets* from the *MySQL DB*;
-- returns the *accuracy score* of the *predictions* made on the requested set, and finally loads them into the *MySQL DB*.
+The *ML Model service*:
+- Waits for requests to train or test the *ML model* on the requested dataset, properly selecting samples and targets from the *PostgreSQL DB*
+- Returns the accuracy score of predictions made on the requested dataset and loads them into the *PostgreSQL DB*
 
 #### ML Model Controller
 ```
 import logging
 from flask import Flask
 from flask_restful import Api, Resource, reqparse
-from flask_mysqldb import MySQL
+from flask_sqlalchemy import SQLAlchemy
 
 from service.i_service import IService
 from web.controller.i_controller import IController
@@ -871,8 +638,8 @@ class MLController(IController):
     def __init__(
             self,
             ml_service: IService,
-            app_host="127.0.0.1", app_port=5000, app_debug=False, base_url="/root", service_url="/model",
-            db_host="127.0.0.1", db_port=3306, db_name="", db_user="root", db_password="pass"
+            app_host="127.0.0.1", app_port=5004, app_debug=False, base_url="/root", service_url="/model",
+            db_host="127.0.0.1", db_port=5432, db_name="", db_user="root", db_password="pass"
     ):
         self.ml_service = ml_service
         self.app_host = app_host
@@ -896,18 +663,13 @@ class MLController(IController):
 
     def initialize(self):
         self.app = Flask(__name__)
-        self.app.config["MYSQL_HOST"] = self.db_host
-        self.app.config["MYSQL_PORT"] = self.db_port
-        self.app.config["MYSQL_DB"] = self.db_name
-        self.app.config["MYSQL_USER"] = self.db_user
-        self.app.config["MYSQL_PASSWORD"] = self.db_password
-        self.app.config["MYSQL_CURSORCLASS"] = "DictCursor"
+        self.app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
+
         self.app.app_context().push()
         self.api = Api(self.app)
         self.parser = reqparse.RequestParser()
-        self.db = MySQL(self.app)
+        self.db = SQLAlchemy(self.app)
         self.logger = logging.getLogger("werkzeug")
-        # self.log.setLevel(logging.ERROR)
 
         self.ml_service.db = self.db
         self.ml_service.init_query()
@@ -967,13 +729,13 @@ class Model(Resource):
         return payload
 ```
 
-The *ML Model controller* allows to:
-- build the `Flask` *App* and the *REST API*;
-- instantiate a connection to the *MySQL DB*;
-- mapping the `Resource` to the correct *endpoint*, allowing to define the proper behaviour for every **CRUD** operation;
-- for each `Resource` it is needed to define the arguments to *parse* inside the *request* body.
+The *ML Model controller* allows us to:
+- Build the `Flask` *App* and *REST API*
+- Instantiate a connection to the *PostgreSQL DB* 
+- Map the `Resource` to the correct *endpoint*, defining proper behavior for every **CRUD** operation
+- Define arguments to parse from the request body for each `Resource`
 
-In addition, the class was created to set a specific model and specify parameters in the body of the request, as shown below:
+Additionally, a class was created to set specific models and parameters through the request body, as shown below:
 ```
 class SetModel(Resource):
     def __init__(self, parser, ml_service: IService):
@@ -1032,20 +794,20 @@ The *Tracking* microservice was developed for:
 1. **Hyperparameter optimization**.
 2. **Cross-validated** model performance evaluation
 3. Creation of Machine learning **Experiments**
-4. **Logging** of Runs Metadata and artifact in MLFlow Database
-5. **Retriving** filtered information from MLFlow Databse
+4. **Logging** of Runs Metadata and artifact in MLflow Database
+5. **Retrieving** filtered information from MLflow Database
 
 ### **MLflow**
 
-MlFlow provides **functions** and **APIs** for easily logging all metadata and artifacts associated with the ML expriments.
+MLflow provides **functions** and **APIs** for easily logging all metadata and artifacts associated with the ML experiments.
 
-Each experiment tracked with **MLflow** is stored in the centralized **MLFlow Database** where can be logging:
+Each experiment tracked with **MLflow** is stored in the centralized **MLflow Database** where the following can be logged:
 
 - **Experiments Data**
 - **Run Details**
 - **Parameters** such as:
-  - **Best Model Parameters** After grid search of  hyperparameter tuning process.
-  - **Grid Search Parameters** includes configurations like:
+  - **Best Model Parameters** from grid search hyperparameter tuning process
+  - **Grid Search Parameters** including configurations like:
     - `cv`: cross-validation splits
     - `scoring`: to evaluate each combination of parameters.
   
@@ -1123,10 +885,10 @@ class TrackingService(IService):
     def init_query(self):
         self.query = Query(self.db, self.mlflow)
 ```
-- Sets up a logger for event tracking.
-- Assigns the mlflow object for tracking experiments.
-- Call to init_query: Invokes the method to configure the query.
-- `self.db = db` Represents an instance of a connection object to a MySQL database.
+- Sets up a logger for event tracking
+- Assigns the MLflow object for tracking experiments 
+- Initializes the query configuration by calling init_query()
+- Stores a PostgreSQL database connection instance in self.db
 
 3. **Model Optimization and Tracking**
 ```
@@ -1139,18 +901,25 @@ class TrackingService(IService):
         id_runs = self.log_to_mlflow(results, experiment_name, X, y, scoring, cv, hyperparameters, description, owner)
         return id_runs
 ```
-This function performs one of the main tasks. the operations performed are:
+This function performs one of the main tasks. The operations performed are:
 - 3.1 **Selection of trainig data records**
 - 3.2 **Splits data into X (features) and y (target)**
 ```
     def define_set(self, records):
+        
         records = pd.DataFrame(records)
-        self.prediction = records["sample_index"].to_frame(name="sample_index")
-        records = records.drop(columns=[
+        self.prediction = records["sample_index"]
+
+        # List of columns to drop
+        columns_to_drop = [
             "dataset_id", "sample_id", "target_id",
             "sample_index", "target_index", "targets.sample_index"
-        ])
-        records.replace({"null", np.nan})
+        ]
+
+        # Drop only the columns that exist in the DataFrame
+        records = records.drop(columns=[col for col in columns_to_drop if col in records.columns], errors='ignore')
+
+        records.replace({"null": np.nan}, inplace=True) 
         X = records.drop(columns=["class"])
         y = records["class"]
         return X, y
@@ -1195,13 +964,13 @@ This function performs one of the main tasks. the operations performed are:
     return metrics
 ```
 - Sets up a grid search for each model
-- Trains the model using the provided data and hyperparameters.
-- Identifies the best-performing model.
-- Evaluates the best model’s performance through cross-validation predictions.
-- Computes performance metrics.
+- Trains the model using the provided data and hyperparameters
+- Identifies the best-performing model
+- Evaluates the best model's performance through cross-validation predictions
+- Computes performance metrics
 
 
-- 3.4 **Logging in MLFlow Database**
+- 3.4 **Logging in MLflow Database**
 
 ```
     def log_to_mlflow(self, models_results, experiment_name, X_train, y_train, scoring_grid_search, cv, param_grid,
@@ -1273,23 +1042,23 @@ This function performs one of the main tasks. the operations performed are:
             raise RuntimeError(f"Error in Experiment Creation: {e}")
 ```
 
-- Create MLflow Experiment ( Check Existing Experiment )
+- Creates MLflow Experiment (Checks for Existing Experiment)
 
-- For Each Best Model start MLflow Run
-  - Sets tags for the experiment type and model type.
+- For Each Best Model starts MLflow Run
+  - Sets tags for the experiment type and model type
 
-- Log Model:
+- Logs Model:
     - Infers the model's signature and logs the model
 
 - Logs various parameters, including:
-  - Best parameters for the model.
-  - Data shape and classes.
-  - Grid search parameters and scoring method.
+  - Best parameters for the model
+  - Data shape and classes
+  - Grid search parameters and scoring method
 
-- Log Metrics related to: model performance, CPU usage, and execution time.
+- Logs metrics related to: model performance, CPU usage, and execution time
 
-- Store Run ID in `run_id_dict`
-- Returns the `run_id_dict` containing all run IDs.
+- Stores Run ID in `run_id_dict`
+- Returns the `run_id_dict` containing all run IDs
 
 
 4. **Information retrieval**
@@ -1322,7 +1091,7 @@ This function performs one of the main tasks. the operations performed are:
         }
         return experiment_info
 ```
-- Gather Experiment details and statistics
+- Gathers experiment details and statistics
 ```
     def get_best_model(self, experiment_runs, filter_req):
         if not filter_req or len(filter_req) == 0:
@@ -1438,8 +1207,8 @@ This function performs one of the main tasks. the operations performed are:
                 "iqr": iqr
             }
 ```
-- Calculate Statistics (mean, median, standard deviation, variance, minimum, maximum, fashion, interquartile range)
-- Returns a dictionary with the calculated statistics for the collected metrics.
+- Calculates descriptive statistics (mean, median, standard deviation, variance, minimum, maximum, mode, interquartile range)
+- Returns a dictionary containing the calculated statistics for the collected metrics
 
 ```
     def get_experiment_runs(self, experiment_id):
@@ -1463,8 +1232,7 @@ This function performs one of the main tasks. the operations performed are:
 
         return runs_list if runs_list else None
 ```
-
- - It retrieves the runs associated with the provided experiment ID and extracts the key information. 
+ - Retrieves runs associated with the provided experiment ID and extracts key information from each run.
 
 ```
     def get_run_parameters(self, run, parameter_type):
@@ -1475,8 +1243,8 @@ This function performs one of the main tasks. the operations performed are:
             if key.startswith(parameter_type)
         }
 ```
-- Extracts parameters from a specific run.
-- Returns a dictionary with the filtered parameters, removing the prefix specified by `parameter_type`.
+- Extracts parameters from a specific run
+- Returns a dictionary with the filtered parameters, removing the prefix specified by `parameter_type`
 ```
     def get_run_metrics(self, run, metric_type):
         run_metrics = run.data.metrics
@@ -1536,7 +1304,7 @@ import json
 import requests
 from flask import Flask, request
 from flask_restful import Api, Resource, reqparse
-from flask_mysqldb import MySQL
+from flask_sqlalchemy import SQLAlchemy
 from mlflow import MlflowException
 
 from src.service.i_service import IService
@@ -1547,9 +1315,9 @@ class TrackingController(IController):
     def __init__(self,
                  tracking_service: IService,
                  app_host="127.0.0.1", app_port=5003, app_debug=False, base_url="/root", service_url="/tracking",
-                 db_dataset_host="127.0.0.1", db_dataset_port=3306, db_dataset_name="", db_dataset_user="root",
+                 db_dataset_host="127.0.0.1", db_dataset_port=5432, db_dataset_name="", db_dataset_user="root",
                  db_dataset_password=None,
-                 db_mlflow_host="127.0.0.1", db_mlflow_port=3306, db_mlflow_name="", db_mlflow_user="root",
+                 db_mlflow_host="127.0.0.1", db_mlflow_port=5432, db_mlflow_name="", db_mlflow_user="root",
                  db_mlflow_password=None,
                  ml_host="127.0.0.1", ml_port=5001, ml_service_url="/ml"):
 
@@ -1594,23 +1362,18 @@ class TrackingController(IController):
     def initialize(self):
         self.app = Flask(__name__)
 
-        self.app.config["MYSQL_HOST"] = self.db_dataset_host
-        self.app.config["MYSQL_PORT"] = self.db_dataset_port
-        self.app.config["MYSQL_DB"] = self.db_dataset_name
-        self.app.config["MYSQL_USER"] = self.db_dataset_user
-        self.app.config["MYSQL_PASSWORD"] = self.db_dataset_password
-        self.app.config["MYSQL_CURSORCLASS"] = "DictCursor"
+        self.app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql://{self.db_dataset_user}:{self.db_dataset_password}@{self.db_dataset_host}:{self.db_dataset_port}/{self.db_dataset_name}"
 
         self.app.app_context().push()
         self.api = Api(self.app)
         self.parser = reqparse.RequestParser()
 
-        self.db_dataset = MySQL(self.app)
+        self.db_dataset = SQLAlchemy(self.app)
         self.logger = logging.getLogger("werkzeug")
 
         self.tracking_service.db = self.db_dataset
 
-        mlflow_uri = f"mysql+pymysql://{self.db_mlflow_user}:{self.db_mlflow_password}@{self.db_mlflow_host}:{self.db_mlflow_port}/{self.db_mlflow_name}"
+        mlflow_uri = f"postgresql://{self.db_mlflow_user}:{self.db_mlflow_password}@{self.db_mlflow_host}:{self.db_mlflow_port}/{self.db_mlflow_name}"
         self.tracking_service.mlflow.set_tracking_uri(mlflow_uri)
 
         self.ml_service_uri = f"http://{self.ml_host}:{self.ml_port}{self.base_url}{self.ml_service_url}"
@@ -1620,30 +1383,30 @@ class TrackingController(IController):
         self.add_resource()
 ```
 
-- **Imports Libraries:** Imports modules for logging, request handling, MySQL interaction, and MLflow.
+- **Import Libraries:** Import modules for logging, request handling, PostgreSQL interaction, and MLflow.
 
-- **Initializes Parameters:**
-  - host, ports, database credentials, and ML service settings.
+- **Initialize Parameters:**
+  - Set host, ports, database credentials, and ML service settings.
 
-- **Configures Flask App:**
-  - Creates a Flask application and sets up the MySQL database configuration.
+- **Configure Flask App:**
+  - Create a Flask application and set up the PostgreSQL database configuration.
 
-- **Initializes API and Parser:**
-  - Sets up a RESTful API and a request parser.
+- **Initialize API and Parser:**
+  - Set up a RESTful API and a request parser.
 
-- **Sets Up Database:**
-  - Creates an instance of the MySQL database and links it to the tracking service.
+- **Set Up Database:**
+  - Create an instance of the PostgreSQL database and link it to the tracking service.
 
-- **Configures MLflow:**
-  - Sets the tracking URI for MLflow using the provided credentials.
+- **Configure MLflow:**
+  - Set the tracking URI for MLflow using the provided credentials.
 
-- **Sets Up ML Service:**
-  - Constructs the URI to access the machine learning service.
+- **Set Up ML Service:**
+  - Construct the URI to access the machine learning service.
 
-- **Initializes Query in Tracking Service:**
-  - Invokes a method to initialize queries in the tracking service.
+- **Initialize Query in Tracking Service:**
+  - Invoke a method to initialize queries in the tracking service.
 
-- **Adds Resources to the API**
+- **Add Resources to the API**
 
 ```
     def add_resource(self):
@@ -1679,12 +1442,15 @@ class TrackingController(IController):
     def run(self):
         self.app.run(host=self.app_host, port=self.app_port, debug=self.app_debug)
 ```
+  - Adds three resources:
+    - TrackingExperiment Resource
+    - TrackingRuns Resource  
+    - Optimization Resource
 
-  - Adds: **TrackingExperiment Resource, TrackingRuns Resource, Optimization Resource** 
-  - Passes Dependencies:
+  - Passes required dependencies to each resource
 
-  - Starts Flask App with `run` Method:
-    - making it accessible on the specified host and port.
+  - Starts the Flask application with the `run` method:
+    - Makes the application accessible on the configured host and port
 
 ```
 class Optimization(Resource):
@@ -1788,10 +1554,10 @@ class Optimization(Resource):
             }, 500
 
 ```
-The `Optimization` endpoint is designed for model management and optimization, and includes two main operations:
+The `Optimization` endpoint is designed for model management and optimization and includes two main operations:
 
-- **setting**: Allows selecting a model via `run_id` and setting it in the machine learning service.
-- **optimization**: Manages optimization information for different models, parameters, and scoring metrics, and records new optimization experiments.
+- **setting**: Allows selecting a model via `run_id` and setting it in the machine learning service
+- **optimization**: Manages optimization information for different models, parameters, and scoring metrics and records new optimization experiments
 
 ```
 class TrackingExperiment(Resource):
@@ -1949,10 +1715,10 @@ class TrackingExperiment(Resource):
             return {"error": "An unexpected error occurred.", "message": str(e)}, 500
 ```
 
-The `TrackingExperiment` endpoint manages operations on experiments. Provides endpoints for:
+The `TrackingExperiment` endpoint manages operations on experiments. It provides endpoints for:
 
 - **GET**: Retrieves a list of experiments, including basic information such as `experiment_id`, `name`, and `run_count`.
-- **POST**: Retrieves details of a specific experiment, such as general information, the best model or aggregate statistics, 
+- **POST**: Retrieves details of a specific experiment, such as general information, the best model, or aggregate statistics, 
 depending on the type of request.
 - **DELETE**: Deletes an experiment specified by `experiment_id`.
 ```
@@ -2105,30 +1871,30 @@ class TrackingRuns(Resource):
 
 `TrackingRuns` Handles operations on executions (`runs`) of experiments. It offers the following methods:
 
-- **GET**: Retrieves all runs for a specific experiment, identified by `experiment_id`.
-- **POST**: Retrieves the parameters and metrics of a specific run (`run_id`) based on the type of request (e.g. `parameters` or `metrics`).
-- **DELETE**: Deletes a specific execution using `run_id`.
+- **GET**: Retrieves all runs for a specific experiment, identified by `experiment_id`
+- **POST**: Retrieves the parameters and metrics of a specific run (`run_id`) based on the type of request (e.g., `parameters` or `metrics`)
+- **DELETE**: Deletes a specific run using `run_id`
 
 ### Error Handling
 
 Each resource handles common errors via `try-except` blocks, returning detailed error messages for:
-- Missing required parameters (`KeyError`).
-- Invalid value errors (`ValueError`).
-- Mlflow-specific errors (`MlflowException`).
-- Generic errors (`Exception`).
+- Missing required parameters (`KeyError`)
+- Invalid value errors (`ValueError`) 
+- MLflow-specific errors (`MlflowException`)
+- Generic errors (`Exception`)
 
 
 ## Monitoring
 
-The focus of this *micro-service* is to observe and monitor the *ML model* in a *production environment*, reporting important signal that can trigger an *ML model re-training*.
+The focus of this *microservice* is to observe and monitor the *ML model* in a *production environment*, reporting important signals that can trigger an *ML model re-training*.
 
 ### Evidently AI
 
-[`Evidently AI`](https://www.evidentlyai.com/) allows to test and monitor data and the *ML model* in a *production environment*, evaluating and tracking the quality of data and *predictions*.
+[`Evidently AI`](https://www.evidentlyai.com/) allows testing and monitor data and the *ML model* in a *production environment*, evaluating and tracking the quality of data and *predictions*.
 
 The main idea is to perform a comparison between:
-- **reference dataset**: the *baseline*, typically the *dataset* on which the *ML model* was trained;
-- **current dataset**: the *production data*, new (and probably dirty) unseen data that come during the *inference* phase.
+- **reference dataset**: the *baseline*, typically the *dataset* on which the *ML model* was trained
+- **current dataset**: the *production data*, new (and potentially dirty) unseen data that comes during the *inference* phase
 
 ```
 from evidently import ColumnMapping
@@ -2147,15 +1913,15 @@ from evidently.test_preset import MulticlassClassificationTestPreset
 
 #### Reports
 
-**Reports** are composed by a combination of multiple **metrics**. **Presets** are a pre-built *metrics* combination that can be used inside a *report*.
+**Reports** are composed of a combination of multiple **metrics**. **Presets** are pre-built *metric* combinations that can be used inside a *report*.
 
-*Reports* can be used in many different step, typically they are suitable for:
-- *visual analysis*;
-- *debugging* and *exploration*;
-- *logging*;
-- *documentation*.
+*Reports* can be used in many different steps, and are typically suitable for:
+- *visual analysis*
+- *debugging* and *exploration*
+- *logging*
+- *documentation*
 
-It is convenient to use *reports* with small *datasets*, with a focus on *interactive visualization*.
+It is convenient to use *reports* with small *datasets*, focusing on *interactive visualization*.
 
 ```
 report = Report(metrics=[
@@ -2168,14 +1934,14 @@ report = Report(metrics=[
 
 #### Tests
 
-**Tests** are *metrics* with a condition, that return a *pass* or *fail* result. *Tests* can be combined inside a **Test Suite**. Also in this case some *Presets* are provided.
+**Tests** are *metrics* with conditions that return a *pass* or *fail* result. *Tests* can be combined inside a **Test Suite**. In this case, some *Presets* are also provided.
 
-*Tests* can be used when performance checks are requested. Every *test* directly verify a precise *expectation* on data or *ML model*, typically they are suitable for:
-- *test-based monitoring* of *production* *ML model*;
-- perform *batch checks* on data or *ML model*;
-- trigger *failure alert*.
+*Tests* can be used when performance checks are needed. Each *test* directly verifies a specific *expectation* on data or the *ML model*. They are typically suitable for:
+- *test-based monitoring* of *production* *ML models*;
+- performing *batch checks* on data or *ML models*;
+- triggering *failure alerts*.
 
-It is convenient to use *tests* also with larger *datasets*, specially when an *expectation* must be checked.
+It is convenient to use *tests* with larger *datasets*, especially when an *expectation* needs to be checked.
 
 ```
 tests = TestSuite(tests=[
@@ -2188,15 +1954,15 @@ tests = TestSuite(tests=[
 ```
 
 #### Customization
-*Evidently AI* allows to rely on:
-- **local library**;
-- **local dashboard**;
-- **online platform**.
+*Evidently AI* allows us to rely on:
+- **local library**
+- **local dashboard** 
+- **online platform**
 
-The results of *reports* and *tests* are proveded in many different format:
-- `Python dictionary`;
-- `JSON`;
-- `HTML file`.
+The results of *reports* and *tests* are provided in several different formats:
+- `Python dictionary`
+- `JSON`
+- `HTML file`
 
 ```
 report.as_dict()
@@ -2209,7 +1975,7 @@ tests.json()
 tests.save_html("tests.html")
 ```
 
-Finally, it is also possible to build *custom* *reports* and *tests*, that can be specifically adapted to the considered *use-case*.
+Finally, it is possible to build *custom* *reports* and *tests* that can be specifically adapted to your *use-case*.
 
 
 ### Code Explanation
@@ -2307,10 +2073,10 @@ class MonitoringModel(IModel):
         self.summary = TestSuite(tests=applied_tests)
 ```
 
-The *Monitoring model* allows to:
-- define the correct *column mapping* associated to the *Wine Dataset*, also considering the task that needs to be solved;
-- define *reports*, *tests* and *summary*, with some default *metrics* and *Presets*;
-- check eventually changes in the *summary* definition.
+The *Monitoring model* allows users to:
+- define the correct *column mapping* associated with the *Wine Dataset*, considering the task that needs to be solved;
+- define *reports*, *tests*, and *summaries* with default *metrics* and *Presets*;
+- check for potential changes in the *summary* definition.
 
 
 #### Monitoring Service
@@ -2385,12 +2151,23 @@ class MonitoringService(IService):
             dataset_id
         )
         records = pd.DataFrame(records)
+
+        columns = records.columns.to_list()
+        # Rename the second occurrence of sample_index to avoid duplication
+        sample_index_idx = [i for i, s in enumerate(columns) if "sample_index" in s]
+        columns[sample_index_idx[1]] = "targets.sample_index"
+        columns[sample_index_idx[2]] = "predictions.sample_index"
+
+        class_idx = [i for i, s in enumerate(columns) if "class" in s]
+        columns[class_idx[0]] = "target"
+        columns[class_idx[1]] = "prediction"
+
+        records.columns = columns
         records = records.drop(columns=[
             "dataset_id", "sample_id", "target_id",
             "sample_index", "target_index", "targets.sample_index",
             "prediction_id", "prediction_index", "predictions.sample_index"
         ])
-        records = records.rename(columns={"class": "target", "predictions.class": "prediction"})
         return records
 
     def compute_report(self, reference, current):
@@ -2428,8 +2205,8 @@ class MonitoringService(IService):
         return result
 ```
 
-The *Monitoring service* allows to:
-- waiting for a *request* to compute *reports*, *tests* or *summary*, properly selecting *samples*, *targets* and *predictions* from the *MySQL DB*, and finally loads the results into the *MySQL DB*.
+The *Monitoring service* allows:
+- Handling requests to compute *reports*, *tests*, or *summaries* by properly selecting *samples*, *targets*, and *predictions* from the *PostgreSQL DB*, and loading the results back into the *PostgreSQL DB*.
 
 
 #### Monitoring Controller
@@ -2437,7 +2214,7 @@ The *Monitoring service* allows to:
 import logging
 from flask import Flask
 from flask_restful import Api, Resource, reqparse
-from flask_mysqldb import MySQL
+from flask_sqlalchemy import SQLAlchemy
 
 from service.i_service import IService
 from web.controller.i_controller import IController
@@ -2447,8 +2224,8 @@ class MonitoringController(IController):
     def __init__(
             self,
             monitoring_service: IService,
-            app_host="127.0.0.1", app_port=5000, app_debug=False, base_url="/root", service_url="/monitoring",
-            db_host="127.0.0.1", db_port=3306, db_name="", db_user="root", db_password="pass"
+            app_host="127.0.0.1", app_port=5004, app_debug=False, base_url="/root", service_url="/monitoring",
+            db_host="127.0.0.1", db_port=5432, db_name="", db_user="root", db_password="pass"
     ):
         self.monitoring_service = monitoring_service
         self.app_host = app_host
@@ -2472,18 +2249,12 @@ class MonitoringController(IController):
 
     def initialize(self):
         self.app = Flask(__name__)
-        self.app.config["MYSQL_HOST"] = self.db_host
-        self.app.config["MYSQL_PORT"] = self.db_port
-        self.app.config["MYSQL_DB"] = self.db_name
-        self.app.config["MYSQL_USER"] = self.db_user
-        self.app.config["MYSQL_PASSWORD"] = self.db_password
-        self.app.config["MYSQL_CURSORCLASS"] = "DictCursor"
+        self.app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
         self.app.app_context().push()
         self.api = Api(self.app)
         self.parser = reqparse.RequestParser()
-        self.db = MySQL(self.app)
+        self.db = SQLAlchemy(self.app)
         self.logger = logging.getLogger("werkzeug")
-        # self.log.setLevel(logging.ERROR)
 
         self.monitoring_service.db = self.db
         self.monitoring_service.init_query()
@@ -2541,106 +2312,23 @@ class Monitoring(Resource):
         return payload
 ```
 
-The *Monitoring controller* allows to:
-- build the `Flask` *App* and the *REST API*;
-- instantiate a connection to the *MySQL DB*;
-- mapping the `Resource` to the correct *endpoint*, allowing to define the proper behaviour for every **CRUD** operation;
-- for each `Resource` it is needed to define the arguments to *parse* inside the *request* body.
+The *Monitoring Controller* allows you to:
+- Build the `Flask` *App* and *REST API*
+- Instantiate a connection to the *PostgreSQL DB* 
+- Map the `Resource` to the correct *endpoint*, defining proper behavior for each **CRUD** operation
+- Define the arguments to parse from the request body for each `Resource`
 
 
 
-## Run Micro-Services
+## Run Microservices
 
-To run all the [`Docker`](https://www.docker.com/) *container* it is sufficient to run the command `docker-compose up -d`, based on the `docker-compose.yml` file.
-In this way all the *containers* can be runmed simultaneously in background. The *simulator*, *ML model* and *tracking* *micro-services* are mapped on different *port*, rely on the *health check* performed on the *MySQL DB* *container*.
-
-```
-services:
-  db:
-    image: mysql:5.7
-    container_name: ml_model_tracking_db
-    restart: always
-    environment:
-      MYSQL_DATABASE: "wines_database"
-      MYSQL_ROOT_PASSWORD: "ale_sql_pass"
-      MYSQL_PASSWORD: "ale_sql_pass"
-    ports:
-      - "3307:3306"
-    healthcheck:
-      test: "/usr/bin/mysql --user=root --password=ale_sql_pass --execute \"SHOW DATABASES;\""
-      interval: 5s
-      timeout: 2s
-      retries: 60
-
-  mlflow_db:
-    image: mysql:5.7
-    container_name: ml_model_tracking_mlflow_db
-    restart: always
-    environment:
-      MYSQL_DATABASE: "mlflow_database"
-      MYSQL_ROOT_PASSWORD: "ale_sql_pass"
-      MYSQL_PASSWORD: "ale_sql_pass"
-    ports:
-      - "3308:3306"
-    healthcheck:
-      test: "/usr/bin/mysql --user=root --password=ale_sql_pass --execute \"SHOW DATABASES;\""
-      interval: 5s
-      timeout: 2s
-      retries: 60
-
-  simulator:
-    build: ./microservices/simulator
-    container_name: ml_model_tracking_simulator
-    ports:
-      - "5000:5000"
-    links:
-      - db
-    depends_on:
-      db:
-        condition: service_healthy
-
-  ml:
-    build: ./microservices/ml
-    container_name: ml_model_tracking_ml
-    ports:
-      - "5001:5001"
-    links:
-      - db
-    depends_on:
-      db:
-        condition: service_healthy
-
-  tracking:
-    build: ./microservices/tracking
-    container_name: ml_model_tracking_tracking
-    ports:
-      - "5002:5002"
-    links:
-      - db
-      - mlflow_db
-    depends_on:
-      db:
-        condition: service_healthy
-      mlflow_db:
-        condition: service_healthy
-
-  monitoring:
-    build: ./microservices/monitoring
-    container_name: ml_model_monitoring_monitoring
-    ports:
-      - "5003:5003"
-    links:
-      - db
-    depends_on:
-      db:
-        condition: service_healthy
+To run all the [`Docker`](https://www.docker.com/) *containers*, it is sufficient to run the command `./launch.sh` following the [README.md](../code/ml-tracking-monitoring/README.md). This will build every container based on the `docker-compose.yml` file.
+All *containers* can run simultaneously in the background. The *simulator*, *ML model* and *tracking* *microservices* are mapped to different *ports* and rely on the *health check* performed on the *PostgreSQL DB* *container*.
 
 
-```
+## Future Work
 
-## Future Integration
-
-There are many other (*open-source*) tools that can be very useful to be used in a *MLOps* pipeline:
-- [`Feast`](https://feast.dev/): a *feature* store used to store *raw data* to pass to the *ML model*;
-- [`Seldon Core`](https://github.com/SeldonIO/seldon-core): a tool that helps in the deployment of *ML model*;
-- [`Kubeflow`](https://www.kubeflow.org/): a platform to build the entire *infra-structure* to integrate and orchestrate all the different tools.
+There are many other (*open-source*) tools that can be useful in a *MLOps* pipeline:
+- [`Feast`](https://feast.dev/): a *feature* store for storing *raw data* to pass to the *ML model*
+- [`Seldon Core`](https://github.com/SeldonIO/seldon-core): a tool that helps with the deployment of *ML models*
+- [`Kubeflow`](https://www.kubeflow.org/): a platform to build the entire *infrastructure* to integrate and orchestrate all the different tools
