@@ -9,6 +9,7 @@ The course requires a decent understanding of Java. A dedicated course can be fo
 * [Apache Maven](https://maven.apache.org/)
 * [Apache JMeter](https://jmeter.apache.org/)
 * [EvidentlyAI](https://github.com/evidentlyai/evidently)
+* [mlflow](https://mlflow.org/)
 * [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 
 ## Books
